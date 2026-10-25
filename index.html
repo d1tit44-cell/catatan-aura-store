@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Catatan Aura Store</title>
+<meta name="theme-color" content="#0d2a5c">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>*{box-sizing:border-box}html,body{margin:0}body{font-size:15px}img{max-width:100%}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>
+/* Layout: dua tab. Kas = total → rekap per layanan (jual/sewa/keluar) → form → riwayat.
+   Stok Server = ringkasan → deretan rak (10–21 server) → isi satu rak yang dibuka. */
+:root{
+  --bg:#f1f6fd; --surface:#ffffff; --line:#d7e3f4; --fg:#17203a; --muted:#5d6886;
+  --accent:#1d63d8; --on-accent:#ffffff; --accent-soft:#e3eefd; --navy:#0d2a5c;
+  --in:#127a4a; --in-soft:#e3f4ea; --out:#c0392b; --out-soft:#fbe7e4; --warn:#a15c00; --warn-soft:#fdf0db;
+  --rent:#7a3fc4; --rent-soft:#f0e7fb;
+  --sans:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1428; --surface:#132040; --line:#24365f; --fg:#e8ecf7; --muted:#97a2c2;
+  --accent:#6fb0ff; --on-accent:#08152e; --accent-soft:#16305a; --navy:#0a1e44;
+  --in:#4fd18f; --in-soft:#173325; --out:#ff8a7a; --out-soft:#3a1f1d; --warn:#f5b454; --warn-soft:#3a2d15;
+  --rent:#c59bff; --rent-soft:#2e2147; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1428; --surface:#132040; --line:#24365f; --fg:#e8ecf7; --muted:#97a2c2;
+  --accent:#6fb0ff; --on-accent:#08152e; --accent-soft:#16305a; --navy:#0a1e44;
+  --in:#4fd18f; --in-soft:#173325; --out:#ff8a7a; --out-soft:#3a1f1d; --warn:#f5b454; --warn-soft:#3a2d15;
+  --rent:#c59bff; --rent-soft:#2e2147; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-block:20px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted)}
+.badge{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);padding:3px 8px;border-radius:999px;margin-bottom:8px}
+h2{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:700}
+h2 small{text-transform:none;letter-spacing:0;font-weight:500;font-size:inherit}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;max-width:420px}
+.tabs button{font:inherit;font-weight:700;border:0;border-radius:9px;padding:10px;background:transparent;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.view{display:grid;gap:22px}
+.totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.totals.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tot{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.tot .lbl{font-size:.8rem;color:var(--muted);font-weight:600}
+.tot .val{font-size:1.25rem;font-weight:600;margin-top:2px;overflow-wrap:anywhere}
+.tot.hl{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tot.hl .lbl{color:inherit;opacity:.85}
+.in{color:var(--in)} .out{color:var(--out)} .rent{color:var(--rent)} .warn{color:var(--warn)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.cols{display:grid;grid-template-columns:340px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:820px){.cols{grid-template-columns:1fr}.totals{grid-template-columns:1fr}.totals.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+form{display:grid;gap:12px}
+label{display:grid;gap:4px;font-size:.82rem;font-weight:600;color:var(--muted)}
+label .opt{font-weight:500}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+textarea{font-family:var(--mono);font-size:.82rem;min-height:110px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fieldlbl{font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:4px}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-weight:700;border:0;padding:9px;background:var(--bg);color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.seg button[aria-pressed="true"].g-in{background:var(--in-soft);color:var(--in)}
+.seg button[aria-pressed="true"].g-out{background:var(--out-soft);color:var(--out)}
+.seg button[aria-pressed="true"].g-rent{background:var(--rent-soft);color:var(--rent)}
+.preview{background:var(--bg);border-radius:8px;padding:10px 12px;font-size:.9rem;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.btn{font:inherit;font-weight:700;border:0;border-radius:8px;padding:10px 14px;background:var(--accent);color:var(--on-accent);cursor:pointer}
+.btn.sm{padding:7px 12px;font-size:.84rem}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn.ok{background:var(--in);color:var(--on-accent)}
+.chip{font:inherit;font-size:.8rem;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:999px;padding:5px 11px;cursor:pointer}
+.chip.danger{color:var(--out);border-color:var(--out);font-weight:700}
+.listhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.note{font-size:.8rem;color:var(--muted)}
+.hint{font-size:.8rem;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:8px 10px;margin:0}
+.empty{color:var(--muted);text-align:center;padding:24px 8px}
+
+/* Kas */
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.svc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:6px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.svc:hover{border-color:var(--accent)}
+.svc[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.svc .name{font-weight:700;margin-bottom:2px}
+.svc .row{display:flex;justify-content:space-between;gap:8px;font-size:.86rem}
+.svc .row span:first-child{color:var(--muted)}
+.svc .netrow{border-top:1px dashed var(--line);padding-top:7px;margin-top:2px;font-weight:700}
+.trx{display:grid;gap:4px;padding:11px 0;border-bottom:1px solid var(--line)}
+.trx:last-child{border-bottom:0}
+.trx .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.trx .what{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.trx .amt{font-weight:700;white-space:nowrap}
+.trx .sub{display:flex;justify-content:space-between;gap:10px;font-size:.78rem;color:var(--muted);flex-wrap:wrap}
+.tag{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:999px;margin-right:4px;vertical-align:1px}
+.tag.jual{background:var(--in-soft);color:var(--in)}
+.tag.sewa{background:var(--rent-soft);color:var(--rent)}
+.tag.out{background:var(--out-soft);color:var(--out)}
+.tag.akun{background:var(--accent-soft);color:var(--accent)}
+.del{font:inherit;font-size:.78rem;border:0;background:none;color:var(--muted);cursor:pointer;padding:0}
+.del.confirm{color:var(--out);font-weight:700}
+
+/* Stok */
+.racks{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.rack{font:inherit;color:inherit;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 10px;cursor:pointer;display:grid;gap:1px}
+.rack:hover{border-color:var(--accent)}
+.rack[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.rack .n{font-family:var(--mono);font-size:1.3rem;font-weight:700;line-height:1.1}
+.rack .u{font-size:.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.rack .c{font-size:.74rem;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap}
+.rack.none{border-style:dashed}
+.rack.none .n{color:var(--muted)}
+.rackhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+.rackhead h3{margin:0;font-size:1.25rem;font-weight:800}
+.rackhead .stats{font-size:.84rem;color:var(--muted)}
+.rackacts{display:flex;gap:6px;flex-wrap:wrap}
+.group{margin-top:14px}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;font:inherit;font-weight:800;font-size:.86rem;padding:12px 14px;border-radius:10px;border:0;cursor:pointer;text-align:left}
+.ghead .gc{display:flex;align-items:center;gap:10px;font-weight:600}
+.chev{display:inline-block;font-size:1.3rem;line-height:1;transition:transform .2s}
+.ghead[aria-expanded="true"] .chev{transform:rotate(90deg)}
+.ghead[aria-expanded="true"]{border-radius:10px 10px 0 0}
+.gbody{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;padding:4px 12px 8px}
+.gbody .acc.picked{margin-inline:-4px;padding-inline:4px}
+.group + .group{margin-top:10px}
+.ghead.ready{background:var(--in-soft);color:var(--in)}
+.ghead.emp{background:var(--warn-soft);color:var(--warn)}
+.acc{display:grid;gap:8px;padding:11px 0;border-bottom:1px solid var(--line)}
+.acc:last-child{border-bottom:0}
+.acc.picked{background:var(--accent-soft);margin-inline:-8px;padding-inline:8px;border-radius:8px}
+.l1{display:flex;gap:10px;align-items:center;min-width:0;font-size:inherit;font-weight:inherit;color:inherit}
+.l1.pickable{cursor:pointer}
+.em{font-family:var(--mono);font-size:.82rem;overflow-wrap:anywhere;min-width:0}
+.acc.emp .em{color:var(--muted)}
+.pick{width:22px;height:22px;flex:none;margin:0;accent-color:var(--accent);padding:0}
+.l2{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.info{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.8rem}
+.srv{font-family:var(--mono);font-weight:700;font-size:.92rem}
+.pill{display:inline-block;font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:999px}
+.pill.ready{background:var(--in-soft);color:var(--in)}
+.pill.emp{background:var(--warn-soft);color:var(--warn)}
+.hist{color:var(--muted)}
+.acts{display:flex;gap:6px;align-items:center;margin-left:auto}
+.acts .btn.sm{min-width:62px}
+.more{min-width:36px}
+.inbox{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg);border-radius:8px;padding:9px}
+.inbox select,.inbox input{width:auto;padding:6px 8px;font-size:.85rem;background:var(--surface)}
+.sellbox{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;background:var(--bg);border-radius:8px;padding:9px}
+.sellbox input{background:var(--surface)}
+.quick{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:.86rem;font-weight:600;padding:10px 0 4px}
+.quick input{width:70px;padding:6px 8px}
+.addbox{background:var(--bg);border-radius:10px;padding:12px;display:grid;gap:12px;margin-bottom:6px}
+.addbox input,.addbox textarea{background:var(--surface)}
+.bulkbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.12);padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.statusbar{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-weight:600;font-size:.86rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.login{min-height:100vh;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;padding:24px max(16px,env(safe-area-inset-left,0px));background:linear-gradient(160deg,#0a1e44,#1d4fa8);color:#fff}
+.login img{width:150px;height:150px;border-radius:28px;filter:drop-shadow(0 8px 24px rgba(80,160,255,.45))}
+.login h1{margin:8px 0 0;font-size:1.7rem;font-weight:800}
+.login p{margin:0;color:#bcd6ff}
+.gbtn{margin-top:18px;background:#fff;color:#0d2a5c;padding:13px 26px;font-size:1rem;border-radius:999px}
+.lmsg{min-height:1.4em;font-weight:600;color:#ffd59a!important}
+.lnote{font-size:.8rem;opacity:.8}
+.brand img{border-radius:18px}
+.toast{font-size:.84rem;color:var(--in);font-weight:600;min-height:1.2em;margin:0}
+.brand{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,#0d2a5c,#1d4fa8);color:#fff;border-radius:16px;padding:16px}
+.brand img{width:84px;height:84px;flex:none;filter:drop-shadow(0 4px 12px rgba(80,160,255,.45))}
+.brand .bt{min-width:0;display:grid;gap:2px}
+.brand h1{color:#fff}
+.brand p{color:#bcd6ff;margin:0;font-weight:600;font-size:.86rem;letter-spacing:.04em}
+.brand .badge{background:rgba(255,255,255,.14);color:#dcebff;justify-self:start;margin-bottom:4px}
+.owner{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:.85rem}
+.owner .no{font-family:var(--mono);font-weight:700;color:#fff;user-select:all}
+.owner .lb{color:#bcd6ff}
+.owner button{font:inherit;font-size:.75rem;font-weight:700;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:999px;padding:3px 10px;cursor:pointer}
+.owner input{width:170px;padding:5px 8px;font-size:.85rem;background:#fff;color:#0d2a5c;border:0}
+.days{display:grid;gap:10px}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px}
+.day.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.day .dh{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.day .dt{font-weight:800}
+.day .live{font-size:.72rem;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px}
+.day .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.day .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.day .k{font-size:.72rem;color:var(--muted);font-weight:600}
+.day .v{font-weight:700;font-size:.95rem;overflow-wrap:anywhere}
+.day .tot{padding:0;border:0;background:none}
+.day .bysvc{font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;border-top:1px dashed var(--line);padding-top:8px}
+.morebtn{justify-self:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<section class="login" id="login">
+  <img src="icon-512.png" alt="Logo Aura Store" width="150" height="150">
+  <h1>Catatan Aura Store</h1>
+  <p>Seller MLBB · Advance Server</p>
+  <button class="btn gbtn" id="btnLogin" type="button">Masuk dengan Google</button>
+  <p class="lmsg" id="loginMsg" aria-live="polite"></p>
+  <p class="lnote">Hanya akun owner yang terdaftar yang bisa masuk.</p>
+</section>
+<div class="wrap" id="app" hidden>
+  <header class="brand">
+    <img src="icon-192.png" alt="Logo Aura Store" width="84" height="84">
+    <div class="bt">
+            <h1>Catatan Aura Store</h1>
+      <p>Seller MLBB · Advance Server</p>
+      <div class="owner" id="ownerBox"></div>
+      <div class="owner"><span class="lb">Masuk sebagai</span><span class="no" id="who" style="font-family:var(--sans)"></span><button id="btnLogout" type="button">Keluar</button></div>
+    </div>
+  </header>
+
+  <p class="statusbar" id="status" aria-live="polite">Memuat data…</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabKas" aria-selected="true">Kas</button>
+    <button role="tab" id="tabStok" aria-selected="false">Stok Server</button>
+  </div>
+
+  <!-- ================= KAS ================= -->
+  <div class="view" id="viewKas">
+    <section>
+      <h2>Total keseluruhan</h2>
+      <div class="totals">
+        <div class="tot"><div class="lbl">Total pemasukan</div><div class="val num in" id="tIn">–</div></div>
+        <div class="tot"><div class="lbl">Uang diambil</div><div class="val num out" id="tOut">–</div></div>
+        <div class="tot hl"><div class="lbl">Sisa saldo</div><div class="val num" id="tNet">–</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Rekap harian <small>(semua penjualan & sewa dijumlah per hari, 00.00–23.59)</small></h2>
+      <div class="days" id="days"></div>
+    </section>
+
+    <section>
+      <h2>Rekap per layanan <small>(ketuk untuk filter riwayat)</small></h2>
+      <div class="svc-grid" id="svcGrid"></div>
+    </section>
+
+    <div class="cols">
+      <section class="panel">
+        <h2>Catat transaksi</h2>
+        <form id="f">
+          <label id="svcWrap">Layanan<select id="fSvc"></select></label>
+          <div><div class="fieldlbl">Jenis</div>
+            <div class="seg">
+              <button type="button" class="g-in" id="bIn" aria-pressed="true">+ Pemasukan</button>
+              <button type="button" class="g-out" id="bOut" aria-pressed="false">− Ambil uang</button>
+            </div></div>
+          <div id="modeWrap"><div class="fieldlbl">Sistem</div>
+            <div class="seg">
+              <button type="button" class="g-in" id="mJual" aria-pressed="true">Jual</button>
+              <button type="button" class="g-rent" id="mSewa" aria-pressed="false">Sewa</button>
+            </div></div>
+          <p class="hint" id="akunHint" hidden>Penjualan akun per server dicatat dari tab Stok Server (tombol Jual), supaya stoknya ikut berkurang.</p>
+          <label id="clientWrap">Nama klien <span class="opt">(opsional)</span><input id="fClient" placeholder="mis. Budi" autocomplete="off"></label>
+          <label id="descWrap" hidden>Keterangan <span class="opt">(opsional)</span><input id="fDesc" placeholder="mis. Ambil untuk modal" autocomplete="off"></label>
+          <label id="amtWrap" hidden>Jumlah uang diambil (Rp)<input id="fAmt" type="number" min="0" step="1000" inputmode="numeric" placeholder="100000"></label>
+          <div class="two" id="qpWrap">
+            <label><span id="qtyLbl">Jumlah klien</span><input id="fQty" type="number" min="1" step="1" value="1" inputmode="numeric" required></label>
+            <label><span id="priceLbl">Harga per klien (Rp)</span><input id="fPrice" type="number" min="0" step="500" placeholder="15000" inputmode="numeric" required></label>
+          </div>
+          <label>Tanggal<input id="fDate" type="date" required></label>
+          <div class="preview"><span>Total</span><strong class="num" id="fTotal">Rp 0</strong></div>
+          <button class="btn" type="submit">Simpan transaksi</button>
+          <p class="toast" id="msg" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="listhead">
+          <h2 style="margin:0" id="listTitle">Riwayat transaksi</h2>
+          <button class="chip" id="clearFilter" hidden>Tampilkan semua</button>
+        </div>
+        <div id="rows"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ================= STOK SERVER ================= -->
+  <div class="view" id="viewStok" hidden>
+    <section>
+      <h2>Ringkasan stok</h2>
+      <div class="totals four">
+        <div class="tot hl"><div class="lbl">Server siap jual</div><div class="val num" id="sServer">–</div></div>
+        <div class="tot"><div class="lbl">Email siap jual</div><div class="val num in" id="sReady">–</div></div>
+        <div class="tot"><div class="lbl">Email kosong</div><div class="val num warn" id="sEmpty">–</div></div>
+        <div class="tot"><div class="lbl">Server terjual</div><div class="val num" id="sSold">–</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="listhead">
+        <h2 style="margin:0">Rak stok <small>(pilih rak untuk dibuka)</small></h2>
+        <form id="newRack" style="display:flex;gap:6px;align-items:center">
+          <input id="newN" type="number" min="1" step="1" inputmode="numeric" placeholder="mis. 25" style="width:100px;padding:6px 8px" aria-label="Jumlah server untuk rak baru">
+          <button class="btn sm" type="submit">+ Rak baru</button>
+        </form>
+      </div>
+      <div class="racks" id="racks"></div>
+    </section>
+
+    <section class="panel" id="rackPanel"></section>
+  </div>
+
+  <form class="bulkbar" id="bulkbar" hidden>
+    <span><strong class="num" id="bbCount">0</strong> email dipilih</span>
+    <button class="btn sm ok" type="submit" id="bbFill">Tandai sudah terisi</button>
+    <button class="chip" type="button" id="bbClear">Batal</button>
+  </form>
+
+  <p class="note">Data tersimpan online di Firebase. Hanya Gmail yang diizinkan yang bisa membuka dan mengubahnya.</p>
+</div>
+
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* Siapa yang boleh masuk diatur di Firestore Rules (Firebase console), bukan di file ini. */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyARewM7r14SSIDSFBph1PGTMbylBeDyECc",
+  authDomain: "catatan-aura-store.firebaseapp.com",
+  projectId: "catatan-aura-store",
+  storageBucket: "catatan-aura-store.firebasestorage.app",
+  messagingSenderId: "321133085026",
+  appId: "1:321133085026:web:3c1798a547d08b5c646c3b"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const FS = { collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch };
+let started = false;
+
+const SERVICES=["Claim Vanguard Otomatis","Jual Akun Cabang","SC & GG","APK Zona ID","Sewa Cabang Otomatis"];
+const AKUN="Jual Akun Cabang";
+const DEF_RACKS=[10,11,12,13,14,15,16,17,18,19,20,21];
+const rp=n=>(n<0?"−":"")+"Rp "+Math.abs(n).toLocaleString("id-ID");
+const iso=x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const today=()=>iso(new Date());
+const ddmm=s=>new Date(s+"T00:00").toLocaleDateString("id-ID",{day:"numeric",month:"short"});
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const LKEY="aurastore.ui";
+
+let S={kas:[],accs:[],racks:DEF_RACKS.slice(),prices:{},owner:""};
+const loaded={kas:false,accs:false,meta:false};
+let fdb=null,me=null,myName="",canWrite=true,dbState="loading";
+let pendingDel=null;
+
+/* ---------- penulisan ke Firestore ---------- */
+async function w(fn){
+  try{await fn();return true}
+  catch(e){
+    console.error(e);
+    flash(e&&e.code==="permission-denied"?"Akun ini tidak punya izin menyimpan.":"Gagal menyimpan. Periksa koneksi lalu coba lagi.");
+    return false;
+  }
+}
+function strip(o){const c={...o};delete c.id;return c}
+const putKas=t=>w(()=>FS.setDoc(FS.doc(fdb,"kas",t.id),strip(t)));
+const delKas=id=>w(()=>FS.deleteDoc(FS.doc(fdb,"kas",id)));
+const putAcc=a=>w(()=>FS.setDoc(FS.doc(fdb,"accs",a.id),strip(a)));
+const delAcc=id=>w(()=>FS.deleteDoc(FS.doc(fdb,"accs",id)));
+const putMeta=()=>w(()=>FS.setDoc(FS.doc(fdb,"meta","settings"),{racks:S.racks,prices:S.prices,owner:S.owner}));
+async function putMany(list){
+  let done=0;
+  for(let i=0;i<list.length;i+=400){
+    const chunk=list.slice(i,i+400),b=FS.writeBatch(fdb);
+    chunk.forEach(a=>b.set(FS.doc(fdb,"accs",a.id),strip(a)));
+    if(!(await w(()=>b.commit())))return done;
+    done+=chunk.length;
+  }
+  return done;
+}
+
+/* ---------- pesan singkat ---------- */
+let msgText="";
+function flash(t){msgText=t;const a=$("msg"),b=$("rMsg");if(a&&!$("viewKas").hidden)a.textContent=t;if(b)b.textContent=t}
+
+/* ---------- Tabs ---------- */
+function showTab(t){
+  $("tabKas").setAttribute("aria-selected",t==="kas");$("tabStok").setAttribute("aria-selected",t==="stok");
+  $("viewKas").hidden=t!=="kas";$("viewStok").hidden=t!=="stok";
+  try{localStorage.setItem(LKEY+".tab",t)}catch(e){}
+  updBar();
+}
+$("tabKas").onclick=()=>showTab("kas");$("tabStok").onclick=()=>showTab("stok");
+
+/* ---------- Status & owner ---------- */
+function renderStatus(){
+  const st=$("status");
+  const txt=dbState==="loading"?"Memuat data…":(!navigator.onLine?"Sedang offline. Catatan tetap tersimpan dan dikirim otomatis saat online.":"");
+  st.hidden=!txt;st.textContent=txt;
+}
+window.addEventListener("online",renderStatus);window.addEventListener("offline",renderStatus);
+let ownerEdit=false;
+function renderOwner(){
+  const no=S.owner,box=$("ownerBox");
+  if(ownerEdit||!no){
+    box.innerHTML=`<span class="lb">Owner:</span><input id="ownerIn" type="tel" inputmode="tel" placeholder="08xx-xxxx-xxxx" value="${esc(no)}" aria-label="Nomor owner"><button id="ownerSave">Simpan</button>`;
+    $("ownerSave").onclick=async()=>{S.owner=$("ownerIn").value.trim();ownerEdit=false;await putMeta();renderOwner()};
+  }else if(no){
+    box.innerHTML=`<span class="lb">Owner:</span><span class="no">${esc(no)}</span><button id="ownerCopy">Salin</button><button id="ownerEdit">Ubah</button>`;
+    $("ownerCopy").onclick=async e=>{try{await navigator.clipboard.writeText(no);e.target.textContent="Tersalin"}catch(err){e.target.textContent="Tekan lama nomornya"}};
+    const ed=$("ownerEdit");if(ed)ed.onclick=()=>{ownerEdit=true;renderOwner()};
+  }else box.innerHTML="";
+}
+
+/* ================= KAS ================= */
+let filter=null,type="in",mode="jual";
+$("fSvc").innerHTML=SERVICES.map(s=>`<option>${s}</option>`).join("");
+$("fDate").value=today();
+function syncForm(){
+  $("bIn").setAttribute("aria-pressed",type==="in");$("bOut").setAttribute("aria-pressed",type==="out");
+  $("mJual").setAttribute("aria-pressed",mode==="jual");$("mSewa").setAttribute("aria-pressed",mode==="sewa");
+  const isIn=type==="in",akun=$("fSvc").value===AKUN;
+  $("svcWrap").hidden=!isIn;$("modeWrap").hidden=!isIn||akun;$("akunHint").hidden=!(isIn&&akun);
+  $("clientWrap").hidden=!isIn;$("descWrap").hidden=isIn&&!akun;
+  $("qpWrap").hidden=!isIn;$("amtWrap").hidden=isIn;
+  $("fQty").required=$("fPrice").required=isIn;$("fAmt").required=!isIn;
+  $("qtyLbl").textContent=akun?"Jumlah":"Jumlah klien";
+  $("priceLbl").textContent=akun?"Harga satuan (Rp)":(mode==="sewa"?"Harga sewa per klien (Rp)":"Harga per klien (Rp)");
+  $("fDesc").placeholder=isIn?"mis. Akun 20 server":"mis. Ambil untuk modal";
+  const t=isIn?(+$("fQty").value||0)*(+$("fPrice").value||0):(+$("fAmt").value||0);
+  $("fTotal").textContent=rp(t);$("fTotal").className="num "+(isIn?(mode==="sewa"&&!akun?"rent":"in"):"out");
+}
+$("bIn").onclick=()=>{type="in";syncForm()};$("bOut").onclick=()=>{type="out";syncForm()};
+$("mJual").onclick=()=>{mode="jual";syncForm()};$("mSewa").onclick=()=>{mode="sewa";syncForm()};
+["fQty","fPrice","fAmt"].forEach(i=>$(i).addEventListener("input",syncForm));
+$("fSvc").addEventListener("change",syncForm);
+$("f").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const akun=$("fSvc").value===AKUN,isIn=type==="in",date=$("fDate").value||today();
+  const t=isIn?{id:uid(),svc:$("fSvc").value,type,mode:akun?"jual":mode,client:$("fClient").value.trim(),
+      desc:$("fDesc").value.trim(),qty:Math.max(1,parseInt($("fQty").value)||1),price:Math.max(0,+$("fPrice").value||0),date,unit:akun?"akun":"klien"}
+    :{id:uid(),svc:null,type:"out",mode:null,client:"",desc:$("fDesc").value.trim(),qty:1,price:Math.max(0,+$("fAmt").value||0),date,unit:""};
+  t.by=me;t.byName=myName;t.at=Date.now();
+  if(await putKas(t)){
+    flash(`Tersimpan: ${trxTitle(t)} · ${rp(t.qty*t.price)}`);
+    $("fClient").value="";$("fDesc").value="";$("fQty").value=1;$("fPrice").value="";$("fAmt").value="";syncForm();
+  }
+});
+$("clearFilter").onclick=()=>{filter=null;render()};
+
+function trxTitle(t){
+  if(t.type==="out")return "Ambil uang"+(t.desc?" · "+t.desc:"");
+  if(t.unit==="akun")return "Jual akun "+(t.desc||"");
+  const who=t.client||(t.qty>1?`${t.qty} klien`:"1 klien");
+  return (t.mode==="sewa"?"Sewa":"Jual")+" · "+who;
+}
+function sums(list){
+  let j=0,s=0,o=0;
+  list.forEach(t=>{const v=t.qty*t.price;if(t.type==="out")o+=v;else if(t.mode==="sewa")s+=v;else j+=v});
+  return{j,s,o,i:j+s,n:j+s-o};
+}
+function renderKas(){
+  const all=sums(S.kas);
+  $("tIn").textContent=rp(all.i);$("tOut").textContent=rp(all.o);$("tNet").textContent=rp(all.n);
+  $("svcGrid").innerHTML=SERVICES.map(sv=>{
+    const l=S.kas.filter(t=>t.svc===sv),x=sums(l),akun=sv===AKUN;
+    return `<button class="svc" data-s="${sv}" aria-pressed="${filter===sv}">
+      <span class="name">${sv}</span>
+      ${akun?`<span class="row"><span>Akun terjual</span><span class="num in">${rp(x.j)}</span></span>`
+        :`<span class="row"><span>Jual</span><span class="num in">${rp(x.j)}</span></span>
+          <span class="row"><span>Sewa</span><span class="num rent">${rp(x.s)}</span></span>`}
+      <span class="row netrow"><span>Total · ${l.length} trx</span><span class="num">${rp(x.i)}</span></span>
+    </button>`}).join("");
+  document.querySelectorAll(".svc").forEach(b=>b.onclick=()=>{filter=filter===b.dataset.s?null:b.dataset.s;render()});
+  $("clearFilter").hidden=!filter;
+  $("listTitle").textContent=filter?`Riwayat · ${filter}`:"Riwayat transaksi";
+  const list=S.kas.filter(t=>!filter||t.svc===filter).sort((a,b)=>b.date.localeCompare(a.date)||(b.at||0)-(a.at||0)).slice(0,kasShown);
+  $("rows").innerHTML=list.length?list.map(t=>{
+    const tag=t.type==="out"?`<span class="tag out">Ambil</span>`:t.unit==="akun"?`<span class="tag akun">Akun</span>`:`<span class="tag ${t.mode}">${t.mode==="sewa"?"Sewa":"Jual"}</span>`;
+    const calc=t.unit==="klien"?`${t.qty} klien × ${t.price.toLocaleString("id-ID")}`:t.qty>1?`${t.qty} × ${t.price.toLocaleString("id-ID")}`:"";
+    const cls=t.type==="out"?"out":t.mode==="sewa"?"rent":"in";
+    const by=t.byName?` · oleh ${esc(t.byName.split(" ")[0])}`:"";
+    return `<div class="trx">
+      <div class="top"><span class="what">${tag}${esc(trxTitle(t))}</span><span class="amt num ${cls}">${t.type==="out"?"−":"+"}${rp(t.qty*t.price)}</span></div>
+      <div class="sub"><span>${ddmm(t.date)}${t.svc?" · "+t.svc:""}${calc?` · <span class="num">${calc}</span>`:""}${by}</span>
+        ${true?`<button class="del ${pendingDel==="k"+t.id?"confirm":""}" data-k="${t.id}">${pendingDel==="k"+t.id?"Yakin hapus?":"Hapus"}</button>`:""}</div>
+    </div>`}).join("")+(S.kas.filter(t=>!filter||t.svc===filter).length>kasShown?`<button class="chip morebtn" id="moreKas" style="margin-top:10px">Tampilkan lebih banyak</button>`:"")
+    :`<div class="empty">${loaded.kas?`Belum ada transaksi${filter?" untuk layanan ini":""}. Isi form untuk mencatat yang pertama.`:"Memuat…"}</div>`;
+  const mk=$("moreKas");if(mk)mk.onclick=()=>{kasShown+=50;renderKas()};
+  document.querySelectorAll("[data-k]").forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.k;
+    if(pendingDel==="k"+id){pendingDel=null;await delKas(id)}else{pendingDel="k"+id;renderKas()}
+  });
+}
+let kasShown=50,daysShown=4;
+function renderDaily(){
+  const td=today();
+  const dates=[...new Set([td,...S.kas.map(t=>t.date)])].sort().reverse();
+  $("days").innerHTML=dates.slice(0,daysShown).map(dt=>{
+    const l=S.kas.filter(t=>t.date===dt),x=sums(l);
+    const by=SERVICES.map(sv=>{const v=sums(l.filter(t=>t.svc===sv)).i;return v?`<span>${sv}: <b class="num">${rp(v)}</b></span>`:""}).join("");
+    const isToday=dt===td;
+    const label=new Date(dt+"T00:00").toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long"});
+    return `<div class="day ${isToday?"today":""}">
+      <div class="dh"><span class="dt">${isToday?"Hari ini · ":""}${label}</span>${isToday?`<span class="live">berjalan sampai 23.59</span>`:`<span class="note">${l.filter(t=>t.type==="in").length} transaksi</span>`}</div>
+      <div class="grid">
+        <div><div class="k">Jual</div><div class="v num in">${rp(x.j)}</div></div>
+        <div><div class="k">Sewa</div><div class="v num rent">${rp(x.s)}</div></div>
+        <div><div class="k">Total masuk</div><div class="v num">${rp(x.i)}</div></div>
+        <div><div class="k">Uang diambil</div><div class="v num out">${x.o?rp(x.o):"–"}</div></div>
+      </div>
+      <div class="bysvc">${by||"Belum ada penjualan atau sewa."}</div>
+    </div>`}).join("")+(dates.length>daysShown?`<button class="chip morebtn" id="moreDays">Tampilkan hari sebelumnya</button>`:"");
+  const mb=$("moreDays");if(mb)mb.onclick=()=>{daysShown+=7;renderDaily()};
+}
+
+/* ================= STOK SERVER =================
+   Tiap email tinggal di satu rak. ready=true → siap jual; ready=false → kosong.
+   Jual: ready jadi false, email tetap di raknya, pemasukan masuk Kas › Jual Akun Cabang. */
+let drawer={ready:false,emp:false};
+let openRack=null,selling=null,moreOpen=null,addOpen=false,addMode="clone",addReady=false;
+try{const r=+localStorage.getItem(LKEY+".rack");if(r)openRack=r}catch(e){}
+const picked=new Set();
+const inRack=n=>S.accs.filter(a=>a.rack===n).sort((a,b)=>(a.at||0)-(b.at||0)||a.email.localeCompare(b.email));
+const accById=id=>S.accs.find(x=>x.id===id);
+function parseLines(txt){
+  const out=[];
+  txt.split(/\r?\n/).forEach(l=>{const m=l.match(/([^\s:]+@[^\s:]+)\s*:?\s*(\d+)?/);if(m)out.push({email:m[1].toLowerCase(),n:m[2]?+m[2]:null})});
+  return out;
+}
+function dotVariants(email,limit){
+  const [lp,dom]=email.toLowerCase().split("@");
+  const base=lp.replace(/\./g,""),L=base.length,total=Math.pow(2,Math.max(0,L-1)),out=[];
+  for(let m=0;m<total&&out.length<limit;m++){
+    let s="";for(let i=0;i<L;i++){s+=base[i];if(i<L-1&&(m>>(L-2-i))&1)s+="."}
+    out.push(s+"@"+dom);
+  }
+  return {list:out,total};
+}
+const say=flash;
+
+$("newRack").addEventListener("submit",async e=>{
+  e.preventDefault();const n=parseInt($("newN").value);if(!n||n<1)return;
+  if(!S.racks.includes(n)){S.racks=[...S.racks,n];await putMeta()}
+  openRack=n;addOpen=true;$("newN").value="";render();say(`Rak ${n} Server siap. Tambahkan email ke rak ini.`);
+});
+$("bulkbar").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const list=[...picked].map(accById).filter(a=>a&&!a.ready).map(a=>({...a,ready:true}));
+  picked.clear();updBar();
+  const c=await putMany(list);say(`${c} email ditandai sudah terisi ${openRack} server.`);
+});
+$("bbClear").onclick=()=>{picked.clear();renderStok()};
+function updBar(){
+  [...picked].forEach(id=>{const a=accById(id);if(!a||a.ready||a.rack!==openRack)picked.delete(id)});
+  $("bulkbar").hidden=!picked.size||$("viewStok").hidden;$("bbCount").textContent=picked.size;
+}
+
+function renderStok(){
+  const ready=S.accs.filter(a=>a.ready),emp=S.accs.filter(a=>!a.ready);
+  $("sServer").textContent=ready.reduce((s,a)=>s+a.rack,0).toLocaleString("id-ID");
+  $("sReady").textContent=ready.length;$("sEmpty").textContent=emp.length;
+  $("sSold").textContent=S.accs.reduce((s,a)=>s+(a.sales||[]).reduce((t,x)=>t+x.n,0),0).toLocaleString("id-ID");
+  const racks=[...S.racks].sort((a,b)=>a-b);
+  if(openRack===null||!racks.includes(openRack))openRack=racks.find(n=>inRack(n).length)??racks[0]??null;
+  $("racks").innerHTML=racks.map(n=>{
+    const l=inRack(n),r=l.filter(a=>a.ready).length,e=l.length-r;
+    return `<button class="rack ${l.length?"":"none"}" data-r="${n}" aria-pressed="${openRack===n}">
+      <span class="n">${n}</span><span class="u">server</span>
+      <span class="c">${l.length?`${r?`<span class="in">${r} siap</span>`:""}${e?`<span class="warn">${e} kosong</span>`:""}`:`<span class="note">belum ada</span>`}</span>
+    </button>`}).join("");
+  document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{
+    openRack=+b.dataset.r;try{localStorage.setItem(LKEY+".rack",openRack)}catch(e){}
+    selling=moreOpen=null;addOpen=false;picked.clear();pendingDel=null;msgText="";renderStok();
+    $("rackPanel").scrollIntoView({behavior:"smooth",block:"start"});
+  });
+
+  if(openRack===null){$("rackPanel").innerHTML=`<div class="empty">Belum ada rak. Buat rak baru di atas.</div>`;return}
+  const n=openRack,l=inRack(n),R=l.filter(a=>a.ready),E=l.filter(a=>!a.ready);
+  const W=dbState==="ok";
+  const row=a=>{
+    const sold=(a.sales||[]).length;
+    return `<div class="acc ${a.ready?"":"emp"} ${picked.has(a.id)?"picked":""}">
+      <label class="l1 ${a.ready||!W?"":"pickable"}">
+        ${a.ready||!W?"":`<input type="checkbox" class="pick" data-pick="${a.id}" ${picked.has(a.id)?"checked":""} aria-label="Pilih email">`}
+        <span class="em">${esc(a.email)}</span>
+      </label>
+      <div class="l2">
+        <div class="info">${a.ready?`<span class="srv">${n} server</span>`:`<span class="pill emp">kosong</span>`}${sold?`<span class="hist">terjual ${sold}×</span>`:""}</div>
+        <div class="acts">
+          ${W?(a.ready?`<button class="btn sm" data-sell="${a.id}" aria-expanded="${selling===a.id}">Jual</button>`:`<button class="btn sm ghost" data-fill="${a.id}">Isi</button>`):""}
+          <button class="chip" data-copy="${a.id}">Salin</button>
+          <button class="chip more" data-more="${a.id}" aria-expanded="${moreOpen===a.id}" aria-label="Lainnya">⋯</button>
+        </div>
+      </div>
+      ${moreOpen===a.id?`<div class="inbox">
+        ${W?`<span class="note">Pindah ke</span>
+        <select data-move="${a.id}" aria-label="Pindah ke rak"><option value="">pilih rak</option>${[...S.racks].sort((x,y)=>x-y).filter(x=>x!==n).map(x=>`<option value="${x}">${x} server</option>`).join("")}</select>
+        ${a.ready?`<button class="chip" data-unfill="${a.id}">Tandai kosong</button>`:""}
+        <button class="chip ${pendingDel==="a"+a.id?"danger":""}" data-adel="${a.id}">${pendingDel==="a"+a.id?"Yakin hapus email ini?":"Hapus email"}</button>`:""}
+        <span class="note" style="flex-basis:100%">${sold?`Riwayat jual: ${a.sales.map(x=>`${ddmm(x.date)} ${rp(x.price)}`).join(" · ")}`:"Belum pernah terjual."}</span>
+      </div>`:""}
+      ${selling===a.id?`<form class="sellbox" data-sellf="${a.id}">
+        <label>Harga jual ${n} server (Rp)<input id="sellPrice" type="number" min="0" step="500" inputmode="numeric" required placeholder="12000" value="${S.prices[n]??""}"></label>
+        <button class="btn sm ok" type="submit">Jual</button>
+      </form>`:""}
+    </div>`;
+  };
+  const addBox=addOpen&&W?`<div class="addbox">
+      <div class="seg"><button type="button" id="amClone" aria-pressed="${addMode==="clone"}">Clone email</button><button type="button" id="amPaste" aria-pressed="${addMode==="paste"}">Tempel daftar</button></div>
+      ${addMode==="clone"?`<form id="fClone">
+        <label>Email dasar<input id="cBase" type="email" placeholder="abcd1234@gmail.com" required autocomplete="off"></label>
+        <label>Jumlah clone<input id="cCount" type="number" min="1" max="2000" value="10" inputmode="numeric" required></label>
+        <p class="note" id="cInfo" style="margin:0">Variasi titik dibuat otomatis (abcd.1234, ab.cd1234, …). Email yang sudah ada dilewati.</p>
+        <div><div class="fieldlbl">Status awal</div><div class="seg">
+          <button type="button" id="arEmp" aria-pressed="${!addReady}">Kosong</button>
+          <button type="button" id="arReady" aria-pressed="${addReady}">Sudah terisi ${n} server</button></div></div>
+        <button class="btn" type="submit">Masukkan ke rak ${n} server</button>
+      </form>`:`<form id="fPaste">
+        <textarea id="pText" placeholder="abcd1234@gmail.com : ${n}s&#10;abcd.1234@gmail.com :"></textarea>
+        <p class="note" style="margin:0">Satu email per baris. Ada angka = sudah terisi (masuk ke rak sesuai angkanya). Tanpa angka = kosong di rak ${n} server.</p>
+        <button class="btn" type="submit">Masukkan</button>
+      </form>`}
+    </div>`:"";
+  $("rackPanel").innerHTML=`
+    <div class="rackhead">
+      <div><h3>Stok ${n} Server</h3>
+        <div class="stats"><span class="num">${l.length}</span> email · <span class="in"><span class="num">${R.length}</span> siap jual</span> · <span class="warn"><span class="num">${E.length}</span> kosong</span> · <span class="num">${(R.length*n).toLocaleString("id-ID")}</span> server</div></div>
+      <div class="rackacts">
+        ${W?`<button class="btn sm ${addOpen?"ghost":""}" id="addToggle">${addOpen?"Tutup":"+ Tambah email"}</button>`:""}
+        ${l.length?`<button class="chip" id="copyRack">Salin daftar</button>`:""}
+      </div>
+    </div>
+    <p class="toast" id="rMsg" aria-live="polite">${esc(msgText)}</p>
+    ${addBox}
+    ${!l.length?`<div class="empty">${loaded.accs?`Rak ${n} Server belum ada email.${W?` Tekan "+ Tambah email" untuk clone atau tempel email ke rak ini.`:""}`:"Memuat…"}
+       ${W&&loaded.accs&&!DEF_RACKS.includes(n)?`<div style="margin-top:10px"><button class="chip ${pendingDel==="r"+n?"danger":""}" id="rmRack">${pendingDel==="r"+n?"Yakin hapus rak ini?":"Hapus rak ini"}</button></div>`:""}</div>`:""}
+    ${R.length?`<div class="group"><button type="button" class="ghead ready" data-drawer="ready" aria-expanded="${drawer.ready}"><span>Siap jual</span><span class="gc"><span class="num">${R.length} email · ${(R.length*n).toLocaleString("id-ID")} server</span><span class="chev">›</span></span></button>
+      ${drawer.ready?`<div class="gbody">${R.map(row).join("")}</div>`:""}</div>`:""}
+    ${E.length?`<div class="group"><button type="button" class="ghead emp" data-drawer="emp" aria-expanded="${drawer.emp}"><span>Kosong · belum ada akun cabang</span><span class="gc"><span class="num">${E.length} email</span><span class="chev">›</span></span></button>
+      ${drawer.emp?`<div class="gbody">
+      ${W?`<form class="quick" id="quick"><span>Tandai</span><input id="qCount" type="number" min="1" max="${E.length}" inputmode="numeric" value="${E.length}" aria-label="Jumlah email"><span>email teratas sudah terisi ${n} server</span><button class="btn sm ok" type="submit">Tandai</button></form>
+      <p class="note" style="margin:0 0 4px">Atau centang email tertentu.</p>`:""}
+      ${E.map(row).join("")}</div>`:""}</div>`:""}
+  `;
+  bindRack(n,E);
+  updBar();
+}
+
+function bindRack(n,E){
+  const on=(id,ev,fn)=>{const el=$(id);if(el)el.addEventListener(ev,fn)};
+  on("addToggle","click",()=>{addOpen=!addOpen;renderStok()});
+  on("amClone","click",()=>{addMode="clone";renderStok()});
+  on("amPaste","click",()=>{addMode="paste";renderStok()});
+  on("arEmp","click",()=>{addReady=false;$("arEmp").setAttribute("aria-pressed",true);$("arReady").setAttribute("aria-pressed",false)});
+  on("arReady","click",()=>{addReady=true;$("arEmp").setAttribute("aria-pressed",false);$("arReady").setAttribute("aria-pressed",true)});
+  on("cBase","input",()=>{
+    const v=$("cBase").value.trim();if(!/^[^@\s]+@[^@\s]+$/.test(v))return;
+    const L=v.split("@")[0].replace(/\./g,"").length;
+    $("cInfo").textContent=`Email ini bisa dibuat sampai ${Math.pow(2,Math.max(0,L-1)).toLocaleString("id-ID")} variasi. Email yang sudah ada dilewati.`;
+  });
+  on("fClone","submit",async e=>{
+    e.preventDefault();
+    const want=Math.max(1,Math.min(2000,parseInt($("cCount").value)||1));
+    const have=new Set(S.accs.map(a=>a.email));
+    const {list,total}=dotVariants($("cBase").value.trim(),want+have.size);
+    const now=Date.now();
+    const fresh=list.filter(x=>!have.has(x)).slice(0,want).map((email,i)=>({id:uid(),email,rack:n,ready:addReady,sales:[],at:now+i}));
+    addOpen=false;renderStok();say(`Menyimpan ${fresh.length} email…`);
+    const c=await putMany(fresh);
+    say(`${c} email masuk ke rak ${n} server sebagai ${addReady?"siap jual":"kosong"}.`+(fresh.length<want?` Variasi habis (maks ${total.toLocaleString("id-ID")}).`:""));
+  });
+  on("fPaste","submit",async e=>{
+    e.preventDefault();
+    const l=parseLines($("pText").value);if(!l.length){say("Tidak ada email yang terbaca.");return}
+    const have=new Set(S.accs.map(a=>a.email));let skip=0;const other=new Set(),list=[],now=Date.now();
+    l.forEach((x,i)=>{
+      if(have.has(x.email)){skip++;return}have.add(x.email);
+      const r=x.n||n;if(r!==n)other.add(r);
+      list.push({id:uid(),email:x.email,rack:r,ready:!!x.n,sales:[],at:now+i});
+    });
+    const newR=[...other].filter(r=>!S.racks.includes(r));
+    if(newR.length){S.racks=[...S.racks,...newR];await putMeta()}
+    addOpen=false;renderStok();
+    const c=await putMany(list);
+    say(`${c} email dimasukkan`+(other.size?` (sebagian ke rak ${[...other].join(", ")})`:"")+(skip?`, ${skip} dilewati karena sudah ada.`:"."));
+  });
+  on("copyRack","click",async()=>{
+    const txt=inRack(n).sort((a,b)=>b.ready-a.ready).map(a=>`${a.email} : ${a.ready?n+" server":""}`).join("\n");
+    try{await navigator.clipboard.writeText(txt);say("Daftar rak disalin dengan format catatan Anda.")}catch(e){say("Gagal menyalin di perangkat ini.")}
+  });
+  on("rmRack","click",async()=>{if(pendingDel==="r"+n){pendingDel=null;S.racks=S.racks.filter(x=>x!==n);openRack=null;await putMeta();render()}else{pendingDel="r"+n;renderStok()}});
+  on("quick","submit",async e=>{
+    e.preventDefault();const k=Math.max(1,parseInt($("qCount").value)||1);
+    picked.clear();const c=await putMany(E.slice(0,k).map(a=>({...a,ready:true})));
+    say(`${c} email ditandai sudah terisi ${n} server.`);
+  });
+  const all=(sel,fn)=>document.querySelectorAll(sel).forEach(fn);
+  all("[data-drawer]",b=>b.onclick=()=>{const k=b.dataset.drawer;drawer[k]=!drawer[k];if(!drawer.emp)picked.clear();selling=moreOpen=null;renderStok()});
+  all("[data-pick]",c=>c.onchange=()=>{const id=c.dataset.pick;c.checked?picked.add(id):picked.delete(id);c.closest(".acc").classList.toggle("picked",c.checked);updBar()});
+  all("[data-fill]",b=>b.onclick=async()=>{const a=accById(b.dataset.fill);picked.delete(a.id);if(await putAcc({...a,ready:true}))say(`${a.email} siap jual (${n} server).`)});
+  all("[data-unfill]",b=>b.onclick=async()=>{const a=accById(b.dataset.unfill);moreOpen=null;await putAcc({...a,ready:false})});
+  all("[data-copy]",b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(accById(b.dataset.copy).email);b.textContent="Tersalin"}catch(e){b.textContent="Gagal"}});
+  all("[data-more]",b=>b.onclick=()=>{const id=b.dataset.more;moreOpen=moreOpen===id?null:id;selling=null;pendingDel=null;renderStok()});
+  all("[data-move]",s=>s.onchange=async()=>{const a=accById(s.dataset.move),r=+s.value;if(!r)return;moreOpen=null;if(await putAcc({...a,rack:r}))say(`${a.email} dipindah ke rak ${r} server.`)});
+  all("[data-adel]",b=>b.onclick=async()=>{const id=b.dataset.adel;if(pendingDel==="a"+id){pendingDel=null;moreOpen=null;await delAcc(id)}else{pendingDel="a"+id;renderStok()}});
+  all("[data-sell]",b=>b.onclick=()=>{const id=b.dataset.sell;selling=selling===id?null:id;moreOpen=null;renderStok();const p=$("sellPrice");if(p)p.focus()});
+  all("[data-sellf]",f=>f.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const a=accById(f.dataset.sellf),price=Math.max(0,+$("sellPrice").value||0),td=today();
+    selling=null;
+    const ok=await putAcc({...a,ready:false,sales:[...(a.sales||[]),{date:td,n,price}]});
+    if(!ok)return;
+    await putKas({id:uid(),svc:AKUN,type:"in",mode:"jual",client:"",desc:`${n} server · ${a.email}`,qty:1,price,date:td,unit:"akun",by:me,byName:myName,at:Date.now()});
+    if(S.prices[n]!==price){S.prices={...S.prices,[n]:price};await putMeta()}
+    say(`${n} server terjual ${rp(price)}. Email tetap di rak ${n} sebagai kosong; pemasukan masuk Kas › Jual Akun Cabang.`);
+  }));
+}
+
+/* ---------- render & sinkron ---------- */
+function render(){renderStatus();renderOwner();renderKas();renderDaily();renderStok()}
+let deferred=false;
+function schedule(){
+  const ae=document.activeElement;
+  if(ae&&$("rackPanel").contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)){deferred=true;renderStatus();renderKas();renderDaily();return}
+  render();
+}
+document.addEventListener("focusout",()=>{if(deferred)setTimeout(()=>{const ae=document.activeElement;if(!(ae&&$("rackPanel").contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName))){deferred=false;render()}},50)});
+
+function startData(){
+  dbState="ok";render();
+  const fail=e=>{console.error(e);if(e.code==="permission-denied"){denied();}};
+  FS.onSnapshot(FS.collection(fdb,"kas"),s=>{S.kas=s.docs.map(x=>({...x.data(),id:x.id}));loaded.kas=true;schedule()},fail);
+  FS.onSnapshot(FS.collection(fdb,"accs"),s=>{S.accs=s.docs.map(x=>({...x.data(),id:x.id}));loaded.accs=true;schedule()},fail);
+  FS.onSnapshot(FS.doc(fdb,"meta","settings"),s=>{const v=s.exists()?s.data():{};S.racks=(v.racks&&v.racks.length?[...v.racks]:DEF_RACKS.slice());S.prices={...(v.prices||{})};S.owner=v.owner||"";loaded.meta=true;schedule()},fail);
+  let lastDay=today();setInterval(()=>{const t=today();if(t!==lastDay){lastDay=t;$("fDate").value=t;renderDaily()}},60000);
+}
+let startTab="kas";try{startTab=localStorage.getItem(LKEY+".tab")||"kas"}catch(e){}
+if(location.hash==="#stok")startTab="stok";
+syncForm();showTab(startTab);
+
+/* ---------- Login ---------- */
+function showLogin(msg){
+  $("login").hidden=false;$("app").hidden=true;
+  $("loginMsg").textContent=msg||"";
+}
+function denied(){
+  showLogin("Akun ini tidak diizinkan membuka Catatan Aura Store.");
+  signOut(auth);
+}
+$("btnLogin").onclick=async()=>{
+  $("loginMsg").textContent="Membuka login Google…";
+  const p=new GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
+  try{await signInWithPopup(auth,p)}
+  catch(e){
+    if(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"){await signInWithRedirect(auth,p)}
+    else if(e.code==="auth/popup-closed-by-user"||e.code==="auth/cancelled-popup-request"){$("loginMsg").textContent=""}
+    else $("loginMsg").textContent="Login gagal ("+e.code+"). Coba lagi.";
+  }
+};
+$("btnLogout").onclick=()=>signOut(auth).then(()=>location.reload());
+getRedirectResult(auth).catch(()=>{});
+onAuthStateChanged(auth,u=>{
+  if(!u){showLogin("");return}
+  const email=(u.email||"").toLowerCase();
+  me=u.uid;myName=u.displayName||email;
+  $("who").textContent=myName;
+  $("login").hidden=true;$("app").hidden=false;
+  if(!started){
+    started=true;
+    fdb=initializeFirestore(fbApp,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+    startData();
+  }
+});
+</script>
+
+</body>
+</html>
